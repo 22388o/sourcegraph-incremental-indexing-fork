@@ -96,11 +96,16 @@ func (c *Client) get(ctx context.Context, mod string, paths ...string) (respBody
 		return nil, errors.Wrap(err, "failed to escape module path")
 	}
 
+	var (
+		reqURL *url.URL
+		req    *http.Request
+	)
+
 	for _, baseURL := range c.urls {
 		limiter := ratelimit.DefaultRegistry.GetOrSet(baseURL, c.limiter)
 
 		startWait := time.Now()
-		if err := limiter.Wait(ctx); err != nil {
+		if err = limiter.Wait(ctx); err != nil {
 			return nil, err
 		}
 
@@ -108,13 +113,13 @@ func (c *Client) get(ctx context.Context, mod string, paths ...string) (respBody
 			log15.Warn("go modules proxy client self-enforced API rate limit: request delayed longer than expected due to rate limit", "delay", d)
 		}
 
-		reqURL, err := url.Parse(baseURL)
+		reqURL, err = url.Parse(baseURL)
 		if err != nil {
 			return nil, errors.Errorf("invalid go modules proxy URL %q", baseURL)
 		}
 		reqURL.Path = path.Join(escapedMod, path.Join(paths...))
 
-		req, err := http.NewRequestWithContext(ctx, "GET", reqURL.String(), nil)
+		req, err = http.NewRequestWithContext(ctx, "GET", reqURL.String(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -166,6 +171,6 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("bad go module proxy response with status code %d for %s: %s", e.Code, e.Path, e.Message)
 }
 
-func (e *Error) IsNotFound() bool {
+func (e *Error) NotFound() bool {
 	return e.Code == http.StatusNotFound || e.Code == http.StatusGone
 }

@@ -59,6 +59,7 @@ func (s *GoModulesSource) ListRepos(ctx context.Context, results chan SourceResu
 		return
 	}
 
+	set := make(map[string]struct{})
 	for _, dep := range deps {
 		_, err := s.client.GetVersion(ctx, dep.PackageSyntax(), dep.PackageVersion())
 		if err != nil {
@@ -66,8 +67,11 @@ func (s *GoModulesSource) ListRepos(ctx context.Context, results chan SourceResu
 			continue
 		}
 
-		repo := s.makeRepo(dep)
-		results <- SourceResult{Source: s, Repo: repo}
+		if _, ok := set[dep.PackageSyntax()]; !ok {
+			repo := s.makeRepo(dep)
+			results <- SourceResult{Source: s, Repo: repo}
+			set[dep.PackageSyntax()] = struct{}{}
+		}
 	}
 
 	lastID := 0
@@ -118,9 +122,12 @@ func (s *GoModulesSource) ListRepos(ctx context.Context, results chan SourceResu
 					return err
 				}
 
-				dep := reposource.NewGoDependency(*mod)
-				repo := s.makeRepo(dep)
-				results <- SourceResult{Source: s, Repo: repo}
+				if _, ok := set[depRepo.Name]; !ok {
+					dep := reposource.NewGoDependency(*mod)
+					repo := s.makeRepo(dep)
+					results <- SourceResult{Source: s, Repo: repo}
+					set[depRepo.Name] = struct{}{}
+				}
 
 				return nil
 			})
